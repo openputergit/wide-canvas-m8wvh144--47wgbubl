@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alphabet Adventure - Fun Spelling Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Bubblegum+Sans&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        body {
+            font-family: 'Comic Neue', cursive;
+            background: #f0f9ff;
+        }
+        .game-title {
+            font-family: 'Bubblegum Sans', cursive;
+        }
+        .character {
+            transition: transform 0.3s;
+        }
+        .character:hover {
+            transform: scale(1.1);
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+        .bounce {
+            animation: bounce 2s infinite;
+        }
+        .stars {
+            transition: all 0.3s;
+        }
+        .star-earned {
+            transform: scale(1.5);
+            color: gold;
+        }
+        @keyframes celebration {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .celebrate {
+            animation: celebration 0.8s ease;
+        }
+        .story-scene {
+            min-height: 120px;
+            transition: all 0.5s ease;
+        }
+        .badge {
+            transition: all 0.3s;
+        }
+        .badge:hover {
+            transform: rotate(15deg);
+        }
+        .trophy {
+            transition: all 0.5s;
+        }
+        .trophy-earned {
+            filter: drop-shadow(0 0 8px gold);
+            transform: scale(1.2);
+        }
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            opacity: 0;
+            transform: translateY(0) rotate(0deg);
+        }
+        @keyframes confettiFall {
+            0% { transform: translateY(-50px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        }
+        .modal {
+            transition: opacity 0.3s ease;
+        }
+        .word-container {
+            perspective: 1000px;
+        }
+        .word-card {
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .word-card.flipped {
+            transform: rotateY(180deg);
+        }
+        .word-front, .word-back {
+            backface-visibility: hidden;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .word-back {
+            transform: rotateY(180deg);
+        }
+        @media (max-width: 640px) {
+            .game-title {
+                font-size: 2.5rem;
+            }
+            .character {
+                padding: 0.5rem;
+            }
+            #currentWord {
+                font-size: 1.75rem;
+            }
+            #spellingInput {
+                width: 80%;
+            }
+        }
+        .word-image {
+            width: 150px;
+            height: 150px;
+            object-fit: contain;
+            margin: 0 auto;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        .word-image:hover {
+            transform: scale(1.05);
+        }
+        .difficulty-btn {
+            transition: all 0.2s ease;
+        }
+        .difficulty-btn.active {
+            transform: scale(1.1);
+            font-weight: bold;
+        }
+        .theme-selector {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .theme-selector:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+
+<div class="min-h-screen p-4" x-data="gameApp()">
+    <!-- Header -->
+    <header class="text-center mb-6">
+        <h1 class="game-title text-4xl md:text-6xl text-blue-600 mb-2">Alphabet Adventure</h1>
+        <p class="text-xl text-gray-600">Learn spelling through fun!</p>
+    </header>
+
+    <!-- Game Container -->
+    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-4 md:p-6">
+        <!-- Character Selection -->
+        <div class="flex flex-wrap justify-center gap-4 mb-6" id="characters">
+            <template x-for="character in characters" :key="character.id">
+                <div class="character cursor-pointer p-4 rounded-lg text-center"
+                    :class="selectedCharacter === character.id ? 
+                        'ring-4 ring-blue-500 ' + character.bgColor : character.bgColor"
+                    @click="selectCharacter(character.id)">
+                    <div class="text-5xl mb-2" x-text="character.emoji"></div>
+                    <p x-text="character.name"></p>
+                </div>
+            </template>
+        </div>
+
+        <!-- Difficulty Selection -->
+        <div x-show="selectedCharacter" class="mb-6">
+            <h3 class="text-center font-bold mb-2">Choose Difficulty:</h3>
+            <div class="flex justify-center gap-3">
+                <button @click="setDifficulty('easy')" 
+                    class="difficulty-btn px-4 py-2 rounded-lg text-sm" 
+                    :class="difficulty === 'easy' ? 'bg-green-500 text-white active' : 'bg-green-100 text-green-700'">
+                    Easy
+                </button>
+                <button @click="setDifficulty('medium')" 
+                    class="difficulty-btn px-4 py-2 rounded-lg text-sm" 
+                    :class="difficulty === 'medium' ? 'bg-yellow-500 text-white active' : 'bg-yellow-100 text-yellow-700'">
+                    Medium
+                </button>
+                <button @click="setDifficulty('hard')" 
+                    class="difficulty-btn px-4 py-2 rounded-lg text-sm" 
+                    :class="difficulty === 'hard' ? 'bg-red-500 text-white active' : 'bg-red-100 text-red-700'">
+                    Hard
+                </button>
+            </div>
+        </div>
+
+        <!-- Story Area -->
+        <div class="story-scene bg-blue-50 p-4 rounded-lg mb-6 text-center">
+            <div class="text-2xl mb-4" id="story" x-text="storyText"></div>
+            <div id="storyImage" class="mx-auto w-24 h-24 mb-2 text-6xl"
+                :class="{'opacity-0': !storyImage}"
+                x-text="storyImage"></div>
+        </div>
+
+        <!-- Game Area -->
+        <div class="text-center mb-6">
+            <!-- Word Image -->
+            <div x-show="currentWordImage && selectedCharacter" class="mb-4">
+                <img :src="currentWordImage" alt="Word illustration" class="word-image shadow-md" />
+            </div>
+
+            <div class="word-container relative mx-auto w-64 h-20">
+                <div class="word-card absolute w-full h-full"
+                    :class="{'flipped': isWordFlipped}">
+                    <div class="word-front text-4xl font-bold flex items-center justify-center"
+                        x-text="currentWord" id="currentWord"></div>
+                    <div class="word-back text-4xl font-bold text-green-600 flex items-center justify-center"
+                        x-text="currentWord"></div>
+                </div>
+            </div>
+            <div class="mb-2 text-gray-600 text-sm" id="wordHint" x-text="wordHint"></div>
+            <input type="text" id="spellingInput" 
+                class="text-2xl p-3 border-4 border-blue-300 rounded-lg w-64 text-center mb-4" 
+                placeholder="Type the word here"
+                x-model="userInput"
+                @keyup.enter="checkSpelling()"
+                :disabled="isLoading || !selectedCharacter">
+            <button @click="checkSpelling()" 
+                class="block mx-auto bg-green-500 text-white px-8 py-3 rounded-xl text-xl hover:bg-green-600 transition"
+                :disabled="isLoading || !selectedCharacter">
+                <span x-show="!isLoading">Check Answer</span>
+                <span x-show="isLoading" class="flex items-center justify-center">
+                    <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Checking...
+                </span>
+            </button>
+            <div id="feedback" class="mt-3 text-xl h-6" x-text="feedback" :class="feedbackClass"></div>
+        </div>
+
+        <!-- Progress & Rewards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Stars -->
+            <div class="bg-gray-50 rounded-lg p-4 flex items-center justify-center">
+                <div class="stars space-x-2">
+                    <template x-for="i in 3" :key="i">
+                        <i class="bi bi-star-fill text-3xl" 
+                            :class="stars >= i ? 'text-yellow-400 star-earned' : 'text-gray-300'"
+                            :id="'star'+i"></i>
+                    </template>
+                </div>
+            </div>
+            
+            <!-- Score and Streak -->
+            <div class="bg-gray-50 rounded-lg p-4 flex flex-col items-center justify-center">
+                <div class="text-xl font-bold" id="score" x-text="`Score: ${score}`"></div>
+                <div class="text-xl" id="streak" x-text="`Streak: ${streak}`"></div>
+                <div class="text-sm text-gray-600 mt-1" x-text="streakMessage"></div>
+            </div>
+            
+            <!-- Badges -->
+            <div class="bg-gray-50 rounded-lg p-4 flex items-center justify-center gap-2">
+                <div class="trophy text-3xl" 
+                    :class="{'opacity-40': stars < 3, 'trophy-earned': stars >= 3}"
+                    id="trophy1">🏆</div>
+                <div class="badge text-2xl" 
+                    :class="{'opacity-40': score < 20, 'celebrate': score >= 20 && !badgeEarned[0]}"
+                    @animationend="badgeEarned[0] = true"
+                    id="badge1">🥇</div>
+                <div class="badge text-2xl" 
+                    :class="{'opacity-40': score < 40, 'celebrate': score >= 40 && !badgeEarned[1]}"
+                    @animationend="badgeEarned[1] = true"
+                    id="badge2">🎖️</div>
+                <div class="badge text-2xl" 
+                    :class="{'opacity-40': score < 60, 'celebrate': score >= 60 && !badgeEarned[2]}"
+                    @animationend="badgeEarned[2] = true"
+                    id="badge3">🏅</div>
+            </div>
+        </div>
+        
+        <!-- Hint Button -->
+        <div class="text-center mt-4">
+            <button id="hintButton" 
+                class="text-blue-500 hover:text-blue-700 text-sm"
+                :class="{'opacity-50': hintUsed || !selectedCharacter}"
+                @click="showHint()"
+                :disabled="hintUsed || !selectedCharacter || isLoading">
+                Need a hint?
+            </button>
+        </div>
+
+        <!-- Theme Selector -->
+        <div class="mt-6 p-4 bg-gray-50 rounded-lg text-center" x-show="selectedCharacter">
+            <h3 class="font-bold text-lg mb-3">Choose a Theme</h3>
+            <div class="flex flex-wrap justify-center gap-3">
+                <div class="theme-selector p-3 bg-blue-100 rounded-lg text-center" 
+                    @click="setTheme('animals')"
+                    :class="{'ring-4 ring-blue-500': currentTheme === 'animals'}">
+                    <div class="text-4xl">🦊</div>
+                    <div class="text-sm font-medium">Animals</div>
+                </div>
+                <div class="theme-selector p-3 bg-green-100 rounded-lg text-center" 
+                    @click="setTheme('nature')"
+                    :class="{'ring-4 ring-blue-500': currentTheme === 'nature'}">
+                    <div class="text-4xl">🌳</div>
+                    <div class="text-sm font-medium">Nature</div>
+                </div>
+                <div class="theme-selector p-3 bg-yellow-100 rounded-lg text-center" 
+                    @click="setTheme('food')"
+                    :class="{'ring-4 ring-blue-500': currentTheme === 'food'}">
+                    <div class="text-4xl">🍎</div>
+                    <div class="text-sm font-medium">Food</div>
+                </div>
+                <div class="theme-selector p-3 bg-purple-100 rounded-lg text-center" 
+                    @click="setTheme('space')"
+                    :class="{'ring-4 ring-blue-500': currentTheme === 'space'}">
+                    <div class="text-4xl">🚀</div>
+                    <div class="text-sm font-medium">Space</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- New AI-Powered Storytelling Feature -->
+        <div class="mt-6 p-4 bg-purple-50 rounded-lg" x-show="selectedCharacter">
+            <h3 class="font-bold text-lg text-center mb-2">AI Storyteller</h3>
+            <p class="text-sm text-center mb-3">Let AI create a special story based on your adventures!</p>
+            <button @click="generateAIStory()" 
+                class="block mx-auto px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition"
+                :disabled="isGeneratingStory || !selectedCharacter">
+                <span x-show="!isGeneratingStory">Generate Story</span>
+                <span x-show="isGeneratingStory" class="flex items-center justify-center">
+                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Creating...
+                </span>
+            </button>
+        </div>
+
+        <!-- Word Database Stats -->
+        <div class="mt-6 p-4 bg-blue-50 rounded-lg text-center text-sm" x-show="selectedCharacter">
+            <p class="mb-1">
+                <span class="font-bold">Current Theme:</span> 
+                <span class="capitalize" x-text="currentTheme"></span>
+            </p>
+            <p>
+                <span class="font-bold">Words Available:</span> 
+                <span x-text="wordCount"></span> in database
+            </p>
+            <p class="text-xs text-gray-500 mt-1">Words automatically adjust to your difficulty level</p>
+        </div>
+    </div>
+    
+    <!-- AI Story Modal -->
+    <div class="fixed inset-0 flex items-center justify-center z-50 modal"
+         x-show="showStoryModal" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+        <div class="absolute inset-0 bg-black opacity-50" @click="showStoryModal = false"></div>
+        <div class="bg-white rounded-lg p-6 max-w-lg w-full mx-4 z-10 relative">
+            <button @click="showStoryModal = false" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">
+                <i class="bi bi-x-lg"></i>
+            </button>
+            <h3 class="text-2xl font-bold text-center mb-4 game-title text-purple-600">Your Adventure Story</h3>
+            <div class="mb-4 text-center text-5xl" x-text="storyCharacterEmoji"></div>
+            <div class="prose max-w-none mb-4" x-html="aiGeneratedStory"></div>
+            <div class="text-center">
+                <button @click="showStoryModal = false" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">
+                    Continue Adventure
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Achievement Modal -->
+    <div class="fixed inset-0 flex items-center justify-center z-50 modal"
+         x-show="showAchievementModal" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+        <div class="absolute inset-0 bg-black opacity-50" @click="showAchievementModal = false"></div>
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 z-10 relative">
+            <div class="text-center">
+                <div class="text-5xl mb-4" x-text="achievementEmoji"></div>
+                <h3 class="text-2xl font-bold text-center mb-2 game-title text-yellow-600">Achievement Unlocked!</h3>
+                <p class="text-lg mb-4" x-text="achievementText"></p>
+                <button @click="showAchievementModal = false" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition">
+                    Awesome!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Word Database Modal -->
+    <div class="fixed inset-0 flex items-center justify-center z-50 modal"
+         x-show="showDatabaseModal" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+        <div class="absolute inset-0 bg-black opacity-50" @click="showDatabaseModal = false"></div>
+        <div class="bg-white rounded-lg p-6 max-w-lg w-full mx-4 z-10 relative max-h-[80vh] overflow-auto">
+            <button @click="showDatabaseModal = false" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">
+                <i class="bi bi-x-lg"></i>
+            </button>
+            <h3 class="text-2xl font-bold text-center mb-4 game-title text-blue-600">Word Database</h3>
+            
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="font-bold">Theme: <span class="capitalize" x-text="currentTheme"></span></span>
+                    <span class="text-sm text-gray-600" x-text="`${filteredWords.length} words shown`"></span>
+                </div>
+                
+                <div class="border border-gray-300 rounded-lg p-2 max-h-96 overflow-y-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100 sticky top-0">
+                            <tr>
+                                <th class="p-2 text-left">Word</th>
+                                <th class="p-2 text-left">Difficulty</th>
+                                <th class="p-2 text-left">Hint</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(word, index) in filteredWords" :key="index">
+                                <tr class="border-t border-gray-200">
+                                    <td class="p-2" x-text="word.word"></td>
+                                    <td class="p-2">
+                                        <span x-show="word.difficulty === 'easy'" class="text-green-500">Easy</span>
+                                        <span x-show="word.difficulty === 'medium'" class="text-yellow-500">Medium</span>
+                                        <span x-show="word.difficulty === 'hard'" class="text-red-500">Hard</span>
+                                    </td>
+                                    <td class="p-2" x-text="word.hint"></td>
+                                </tr>
+                            </template>
+                            <tr x-show="filteredWords.length === 0">
+                                <td colspan="3" class="p-4 text-center text-gray-500">No words found for this theme</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="text-center">
+                <button @click="showDatabaseModal = false" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition">
+                    Back to Game
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="text-center mt-6 text-gray-500 text-sm">
+        <p>Alphabet Adventure - Making Learning Fun!</p>
+        <button @click="showDatabaseModal = true" class="text-blue-500 hover:underline text-xs mt-1">
+            View Word Database
+        </button>
+    </footer>
+
+    <!-- Confetti Canvas (for celebrations) -->
+    <canvas id="confettiCanvas" class="fixed top-0 left-0 w-full h-full pointer-events-none z-50" style="display:none;"></canvas>
+</div>
+
+<script>
+    function gameApp() {
+        return {
+            // Game state
+            wordDatabases: {
+                animals: [
+                    { word: 'CAT', hint: "A furry pet that says meow", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'DOG', hint: "A loyal pet that barks", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1517423440428-a5a00ad493e8?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'BIRD', hint: "An animal with feathers that can fly", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1522926193341-e9ffd686c60f?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'FISH', hint: "It lives in water and has scales", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1524704654690-b56c05c78a00?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'RABBIT', hint: "A fluffy animal with long ears", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1585110396000-c9ffd4e4b308?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'LION', hint: "The king of the jungle", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1546182990-dffeafbe841d?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'TIGER', hint: "A big cat with stripes", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1549366021-9f761d450615?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'BEAR', hint: "A big animal that likes honey", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1530595467537-0b5996c41f2d?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'FROG', hint: "It jumps and lives near water", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1551189014-fe516aed0e9e?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'DUCK', hint: "A bird that swims and quacks", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1555852095-64e7428df0fa?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'ELEPHANT', hint: "A large animal with a trunk", difficulty: 'hard', image: 'https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'GIRAFFE', hint: "An animal with a very long neck", difficulty: 'hard', image: 'https://images.unsplash.com/photo-1547721064-da6cfb341d50?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'PENGUIN', hint: "A bird that swims but cannot fly", difficulty: 'hard', image: 'https://images.unsplash.com/photo-1551986782-d0169b3f8fa7?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'DOLPHIN', hint: "A smart sea animal that makes clicking sounds", difficulty: 'hard', image: 'https://images.unsplash.com/photo-1570481662006-a3a1374699e8?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'SQUIRREL', hint: "A small animal with a bushy tail that collects nuts", difficulty: 'hard', image: 'https://images.unsplash.com/photo-1507666405895-422eee7d517f?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' }
+                ],
+                nature: [
+                    { word: 'TREE', hint: "It has a trunk and leaves", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1502082553048-f009c37129b9?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'LEAF', hint: "It grows on trees and can be green", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1503785640985-f62e3aeee448?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'ROCK', hint: "A hard thing found on the ground", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1525857597365-5d6985357a15?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'SAND', hint: "Found at the beach", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1457195740896-7f345efef228?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'RIVER', hint: "Water that flows between banks", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1545641203-7d072a14e3b2?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'FOREST', hint: "A large area with many trees", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1448375240586-882707db888b?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'FLOWER', hint: "A colorful plant that may smell nice", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1490750967868-88aa4486c946?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'CLOUD', hint: "White or gray puff in the sky", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1611928482473-7b27d24eab80?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'MOUNTAIN', hint: "A very tall landform", difficulty: 'hard', image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'WATERFALL', hint: "Water flowing down from high up", difficulty: 'hard', image: 'https://images.unsplash.com/photo-1564928275797-a54c7304cab3?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'RAINBOW', hint: "Colorful arc in the sky after rain", difficulty: 'hard', image: 'https://images.unsplash.com/photo-1525874684015-58379d421a52?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'VOLCANO', hint: "A mountain that can erupt lava", difficulty: 'hard', image: 'https://images.unsplash.com/photo-1554322662-4b737d22e23a?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' }
+                ],
+                food: [
+                    { word: 'APPLE', hint: "A red or green fruit", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'BANANA', hint: "A long yellow fruit", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1528825871115-3581a5387919?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'BREAD', hint: "Used to make sandwiches", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc7b?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'MILK', hint: "A white drink that comes from cows", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'PIZZA', hint: "A round food with cheese and toppings", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1534308983496-4fabb1a015ee?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'COOKIE', hint: "A sweet baked treat", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'CANDY', hint: "Sweet treats that children love", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1581798459219-361b284246bc?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'CARROT', hint: "An orange vegetable", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1447175008436-054170c2e979?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'SPAGHETTI', hint: "Long pasta noodles", difficulty: 'hard', image: 'https://images.unsplash.com/photo-1551892374-ecf8754cf8b0?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'PANCAKE', hint: "A flat breakfast food with syrup", difficulty: 'hard', image: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'WATERMELON', hint: "A large juicy fruit with green skin and red inside", difficulty: 'hard', image: 'https://images.unsplash.com/photo-1563114773-84221bd62daa?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' }
+                ],
+                space: [
+                    { word: 'STAR', hint: "A bright light in the night sky", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1494253109108-2e30c049369b?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'MOON', hint: "It circles around Earth", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1532693322450-2cb5c511067d?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'SUN', hint: "It gives us light during the day", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1575881875475-31023242e3f9?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'SKY', hint: "What you see when you look up", difficulty: 'easy', image: 'https://images.unsplash.com/photo-1534088568595-a066f410bcda?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'PLANET', hint: "Earth is one of these", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1614730321146-b6fa6a46bcb4?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'ROCKET', hint: "A vehicle that goes to space", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1517976547714-720226b864c1?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'COMET', hint: "Space object with a bright tail", difficulty: 'medium', image: 'https://images.unsplash.com/photo-1518406822732-2585689aa459?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'GALAXY', hint: "A huge collection of stars", difficulty: 'hard', image: 'https://images.unsplash.com/photo-1505506874110-6a7a69069a08?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'ASTRONAUT', hint: "A person who travels in space", difficulty: 'hard', image: 'https://images.unsplash.com/photo-1454789548928-9efd52dc4031?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' },
+                    { word: 'TELESCOPE', hint: "Used to look at distant objects in space", difficulty: 'hard', image: 'https://images.unsplash.com/photo-1584477701174-1a5c9e5d22a3?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&h=300&q=80' }
+                ]
+            },
+            characters: [
+                { id: 1, name: "Felix Fox", emoji: "🦊", bgColor: "bg-blue-100" },
+                { id: 2, name: "Bella Bunny", emoji: "🐰", bgColor: "bg-pink-100" },
+                { id: 3, name: "Ollie Owl", emoji: "🦉", bgColor: "bg-purple-100" },
+                { id: 4, name: "Penny Panda", emoji: "🐼", bgColor: "bg-yellow-100" }
+            ],
+            storyScenes: {
+                start: [
+                    "Let's explore the magical forest!",
+                    "Today we're going on an adventure to the beach!",
+                    "We're exploring a mysterious castle today!",
+                    "We're setting off on a space journey!"
+                ],
+                correct: [
+                    "Great job! You found a magical key!",
+                    "Amazing! You discovered a hidden treasure!",
+                    "Excellent! You helped the animals cross the river!",
+                    "Perfect! You solved the ancient riddle!"
+                ],
+                incorrect: [
+                    "That's not quite right, but keep trying!",
+                    "Almost there! Try once more!",
+                    "Don't worry, everyone makes mistakes!",
+                    "You're getting closer! Try again!"
+                ],
+                milestone: [
+                    "You've earned a special power! You can now see invisible paths!",
+                    "The animals of the forest thank you for your help!",
+                    "You've unlocked a new area to explore!",
+                    "The castle gates are opening for you!"
+                ]
+            },
+            storyImages: {
+                forest: "🌳", 
+                castle: "🏰",
+                beach: "🏖️",
+                space: "🚀",
+                key: "🔑",
+                treasure: "💎",
+                map: "🗺️",
+                magic: "✨"
+            },
+            
+            // Current game state
+            currentWordIndex: 0,
+            score: 0,
+            streak: 0,
+            stars: 0,
+            badges: 0,
+            selectedCharacter: null,
+            currentTheme: 'animals',
+            difficulty: 'easy',
+            hintUsed: false,
+            userInput: '',
+            currentWord: '',
+            currentWordImage: '',
+            wordHint: '',
+            feedback: '',
+            feedbackClass: '',
+            storyText: 'Choose your adventure buddy to start learning!',
+            storyImage: '',
+            streakMessage: 'Keep going!',
+            isLoading: false,
+            
+            // Word animation
+            isWordFlipped: false,
+            
+            // AI Storytelling
+            isGeneratingStory: false,
+            showStoryModal: false,
+            aiGeneratedStory: '',
+            storyCharacterEmoji: '',
+            
+            // Achievements
+            showAchievementModal: false,
+            achievementEmoji: '',
+            achievementText: '',
+            badgeEarned: [false, false, false],
+
+            // Database management
+            showDatabaseModal: false,
+            
+            // Initialize game
+            init() {
+                this.initializeWordDatabase();
+                this.displayWord();
+                
+                // Set up confetti
+                this.confettiCanvas = document.getElementById('confettiCanvas');
+                this.confettiCtx = this.confettiCanvas.getContext('2d');
+                this.resizeCanvas();
+                window.addEventListener('resize', this.resizeCanvas.bind(this));
+            },
+
+            get filteredWords() {
+                if (!this.currentTheme) return [];
+                return this.wordDatabases[this.currentTheme] || [];
+            },
+
+            get wordCount() {
+                return this.filteredWords.length;
+            },
+            
+            resizeCanvas() {
+                const canvas = this.confettiCanvas;
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            },
+
+            initializeWordDatabase() {
+                // Fetch initial word database from MongoDB
+                // This is where we'd typically load from the database
+                // For now we're using the preset data
+                
+                // Initialize database in MongoDB if it doesn't exist
+                this.saveWordDatabase();
+            },
+
+            async saveWordDatabase() {
+                try {
+                    // This would typically save to MongoDB
+                    // For now, we're just simulating the API call
+                    const appSlug = 'alphabet-adventure-123456';
+                    
+                    // Example of saving a theme's words
+                    /*
+                    await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/mongodb', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer 3vXuHD58e5PlqxgrjhJW9D8EmR43',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            appSlug,
+                            action: 'create',
+                            collection: 'wordDatabase',
+                            data: {
+                                theme: this.currentTheme,
+                                words: this.wordDatabases[this.currentTheme]
+                            }
+                        })
+                    });
+                    */
+                } catch (error) {
+                    console.error('Error saving word database:', error);
+                }
+            },
+            
+            displayWord() {
+                if (!this.selectedCharacter) {
+                    this.currentWord = '';
+                    this.currentWordImage = '';
+                    return;
+                }
+
+                // Filter words by current theme and difficulty
+                const themeWords = this.wordDatabases[this.currentTheme] || [];
+                const difficultyWords = themeWords.filter(word => word.difficulty === this.difficulty);
+                
+                // If no words match our difficulty, fall back to all words in theme
+                const wordsToUse = difficultyWords.length > 0 ? difficultyWords : themeWords;
+                
+                // Select a random word
+                this.currentWordIndex = Math.floor(Math.random() * wordsToUse.length);
+                
+                if (wordsToUse.length > 0) {
+                    this.currentWord = wordsToUse[this.currentWordIndex].word;
+                    this.currentWordImage = wordsToUse[this.currentWordIndex].image;
+                } else {
+                    // Fallback if no words available
+                    this.currentWord = "CAT";
+                    this.currentWordImage = '';
+                }
+            },
+            
+            selectCharacter(id) {
+                this.selectedCharacter = id;
+                const character = this.characters.find(c => c.id === id);
+                
+                // Start story
+                const storyIndex = Math.floor(Math.random() * this.storyScenes.start.length);
+                this.storyText = `${this.storyScenes.start[storyIndex]} ${character.name} is your guide!`;
+                
+                // Show story image
+                const images = Object.values(this.storyImages);
+                this.storyImage = images[Math.floor(Math.random() * images.length)];
+                
+                this.displayWord();
+            },
+
+            setTheme(theme) {
+                this.currentTheme = theme;
+                
+                // Update story based on theme
+                let themeStory = '';
+                switch(theme) {
+                    case 'animals':
+                        themeStory = "Welcome to the Animal Kingdom!";
+                        break;
+                    case 'nature':
+                        themeStory = "Let's explore the wonders of Nature!";
+                        break;
+                    case 'food':
+                        themeStory = "Time for a delicious Food Adventure!";
+                        break;
+                    case 'space':
+                        themeStory = "Blast off to outer Space!";
+                        break;
+                    default:
+                        themeStory = "Choose a new theme for your adventure!";
+                }
+                
+                // Update story
+                const character = this.characters.find(c => c.id === this.selectedCharacter);
+                this.storyText = `${themeStory} ${character?.name || ''} is excited!`;
+                
+                // Show theme-related image
+                let themeImage = '';
+                switch(theme) {
+                    case 'animals': themeImage = '🐾'; break;
+                    case 'nature': themeImage = '🌳'; break;
+                    case 'food': themeImage = '🍽️'; break;
+                    case 'space': themeImage = '🚀'; break;
+                }
+                this.storyImage = themeImage;
+                
+                // Reset game state
+                this.displayWord();
+            },
+
+            setDifficulty(level) {
+                this.difficulty = level;
+                
+                // Update story based on difficulty
+                let difficultyMessage = '';
+                switch(level) {
+                    case 'easy':
+                        difficultyMessage = "Starting with some easy words!";
+                        break;
+                    case 'medium':
+                        difficultyMessage = "Ready for a moderate challenge!";
+                        break;
+                    case 'hard':
+                        difficultyMessage = "Brave explorer taking on hard words!";
+                        break;
+                }
+                
+                // Update story
+                const character = this.characters.find(c => c.id === this.selectedCharacter);
+                this.storyText = `${difficultyMessage} ${character?.name || ''} believes in you!`;
+                
+                // Reset game state
+                this.displayWord();
+            },
+            
+            showHint() {
+                if (!this.selectedCharacter) {
+                    alert('Please select a character first!');
+                    return;
+                }
+                
+                this.hintUsed = true;
+
+                // Get hint from current word
+                const currentThemeWords = this.wordDatabases[this.currentTheme] || [];
+                const difficultyWords = currentThemeWords.filter(word => word.difficulty === this.difficulty);
+                const wordsToUse = difficultyWords.length > 0 ? difficultyWords : currentThemeWords;
+                
+                if (wordsToUse.length > 0) {
+                    this.wordHint = wordsToUse[this.currentWordIndex].hint;
+                } else {
+                    this.wordHint = "A hint would be here";
+                }
+                
+                // Character animation
+                const characterEl = document.querySelector(`.character:nth-child(${this.selectedCharacter})`);
+                characterEl.classList.add('bounce');
+                setTimeout(() => characterEl.classList.remove('bounce'), 2000);
+            },
+            
+            async checkSpelling() {
+                if (!this.selectedCharacter) {
+                    alert('Please select a character first!');
+                    return;
+                }
+                
+                this.isLoading = true;
+                
+                // Simulate API delay
+                await new Promise(resolve => setTimeout(resolve, 800));
+                
+                const input = this.userInput.toUpperCase();
+                const correct = input === this.currentWord;
+                
+                if (correct) {
+                    // Success animation
+                    this.isWordFlipped = true;
+                    setTimeout(() => {
+                        this.isWordFlipped = false;
+                    }, 1500);
+                    
+                    // Calculate points based on difficulty and hint usage
+                    let pointsEarned = this.hintUsed ? 5 : 10;
+                    if (this.difficulty === 'medium') pointsEarned *= 1.5;
+                    if (this.difficulty === 'hard') pointsEarned *= 2;
+                    pointsEarned = Math.floor(pointsEarned);
+                    
+                    this.score += pointsEarned;
+                    this.streak++;
+                    
+                    // Update streak message
+                    if (this.streak >= 5) {
+                        this.streakMessage = "You're on fire! 🔥";
+                    } else if (this.streak >= 3) {
+                        this.streakMessage = "Great streak! 👏";
+                    } else {
+                        this.streakMessage = "Keep going!";
+                    }
+                    
+                    // Feedback
+                    this.feedback = `Correct! +${pointsEarned} points`;
+                    this.feedbackClass = 'mt-3 text-xl h-6 text-green-600 celebrate';
+                    
+                    // Update story with success
+                    const storyIndex = Math.floor(Math.random() * this.storyScenes.correct.length);
+                    this.storyText = this.storyScenes.correct[storyIndex];
+                    
+                    // Update story image
+                    const successImages = [this.storyImages.key, this.storyImages.treasure, this.storyImages.magic];
+                    this.storyImage = successImages[Math.floor(Math.random() * successImages.length)];
+                    
+                    // Award streaks
+                    if (this.streak % 3 === 0) {
+                        this.addStar();
+                    }
+                    
+                    // Award badges
+                    if (this.score >= 20 && !this.badgeEarned[0]) {
+                        setTimeout(() => {
+                            this.showAchievement('🥇', 'Beginning Speller Badge earned!');
+                        }, 1000);
+                    }
+                    
+                    if (this.score >= 40 && !this.badgeEarned[1]) {
+                        setTimeout(() => {
+                            this.showAchievement('🎖️', 'Intermediate Speller Badge earned!');
+                        }, 1000);
+                    }
+                    
+                    if (this.score >= 60 && !this.badgeEarned[2]) {
+                        setTimeout(() => {
+                            this.showAchievement('🏅', 'Advanced Speller Badge earned!');
+                            this.createConfetti();
+                        }, 1000);
+                    }
+                    
+                    // Award trophy
+                    if (this.stars >= 3 && document.getElementById('trophy1').classList.contains('opacity-40')) {
+                        setTimeout(() => {
+                            this.showAchievement('🏆', 'Spelling Champion Trophy earned!');
+                            this.createConfetti();
+                        }, 1500);
+                    }
+                    
+                    // Character animation
+                    const characterEl = document.querySelector(`.character:nth-child(${this.selectedCharacter})`);
+                    characterEl.classList.add('bounce');
+                    setTimeout(() => characterEl.classList.remove('bounce'), 2000);
+                    
+                    // Display next word
+                    setTimeout(() => {
+                        this.displayWord();
+                        this.userInput = '';
+                        this.wordHint = '';
+                        this.hintUsed = false;
+                    }, 1500);
+                    
+                } else {
+                    // Reset streak on wrong answer
+                    this.streak = 0;
+                    this.streakMessage = "Try again! You can do it!";
+                    this.feedback = "Try again!";
+                    this.feedbackClass = 'mt-3 text-xl h-6 text-red-500';
+                    
+                    // Update story with encouragement
+                    const storyIndex = Math.floor(Math.random() * this.storyScenes.incorrect.length);
+                    this.storyText = this.storyScenes.incorrect[storyIndex];
+                }
+                
+                this.isLoading = false;
+            },
+            
+            addStar() {
+                if (this.stars < 3) {
+                    this.stars++;
+                    
+                    // Show milestone story for stars
+                    const milestoneIndex = Math.floor(Math.random() * this.storyScenes.milestone.length);
+                    this.storyText = this.storyScenes.milestone[milestoneIndex];
+                    
+                    // Show achievement
+                    setTimeout(() => {
+                        this.showAchievement('⭐', `You earned star ${this.stars}!`);
+                    }, 1000);
+                }
+            },
+            
+            showAchievement(emoji, text) {
+                this.achievementEmoji = emoji;
+                this.achievementText = text;
+                this.showAchievementModal = true;
+            },
+            
+            createConfetti() {
+                this.confettiCanvas.style.display = 'block';
+                const colors = ['#FF5252', '#FFD740', '#64FFDA', '#448AFF', '#BA68C8'];
+                
+                for (let i = 0; i < 150; i++) {
+                    setTimeout(() => {
+                        const x = Math.random() * this.confettiCanvas.width;
+                        const y = -20;
+                        const size = Math.random() * 12 + 5;
+                        const color = colors[Math.floor(Math.random() * colors.length)];
+                        
+                        this.animateConfetti(x, y, size, color);
+                    }, i * 20);
+                }
+                
+                setTimeout(() => {
+                    this.confettiCanvas.style.display = 'none';
+                }, 5000);
+            },
+            
+            animateConfetti(x, y, size, color) {
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = Math.random() * 2 + 2;
+                const rotationSpeed = Math.random() * 0.2 - 0.1;
+                
+                let currentX = x;
+                let currentY = y;
+                let rotation = 0;
+                let opacity = 1;
+                
+                const animate = () => {
+                    this.confettiCtx.clearRect(currentX - size - 2, currentY - size - 2, size * 2 + 4, size * 2 + 4);
+                    
+                    currentX += Math.cos(angle) * velocity;
+                    currentY += Math.sin(angle) * velocity + 1; // gravity
+                    rotation += rotationSpeed;
+                    opacity -= 0.005;
+                    
+                    if (opacity <= 0 || currentY > this.confettiCanvas.height) return;
+                    
+                    this.confettiCtx.save();
+                    this.confettiCtx.translate(currentX, currentY);
+                    this.confettiCtx.rotate(rotation);
+                    this.confettiCtx.globalAlpha = opacity;
+                    this.confettiCtx.fillStyle = color;
+                    this.confettiCtx.fillRect(-size/2, -size/2, size, size);
+                    this.confettiCtx.restore();
+                    
+                    requestAnimationFrame(animate);
+                };
+                
+                animate();
+            },
+            
+            async generateAIStory() {
+                if (!this.selectedCharacter) return;
+                
+                this.isGeneratingStory = true;
+                
+                // Get character data
+                const character = this.characters.find(c => c.id === this.selectedCharacter);
+                this.storyCharacterEmoji = character.emoji;
+                
+                try {
+                    // Call the AI endpoint
+                    const response = await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/ai', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer 3vXuHD58e5PlqxgrjhJW9D8EmR43',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            messages: [
+                                {
+                                    role: 'user',
+                                    content: [
+                                        {
+                                            type: 'text',
+                                            text: `Create a short, engaging children's story about a character named ${character.name} going on an adventure in a ${this.currentTheme} themed world. The story should be about learning to spell words like ${this.currentWord.toLowerCase()}. Make it educational but fun for kindergarten kids. Keep it under 200 words and include a simple moral lesson.`
+                                        }
+                                    ]
+                                }
+                            ]
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Failed to generate story');
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Process the AI response
+                    this.aiGeneratedStory = data.message
+                        .replace(/\n/g, '<br>')
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                        
+                    // Show the story modal
+                    this.showStoryModal = true;
+                    
+                } catch (error) {
+                    console.error('Error generating story:', error);
+                    this.aiGeneratedStory = `<p>Once upon a time, ${character.name} went on a spelling adventure in the world of ${this.currentTheme}! They learned many new words like "${this.currentWord.toLowerCase()}" and had fun along the way. The end!</p>`;
+                    this.showStoryModal = true;
+                }
+                
+                this.isGeneratingStory = false;
+            }
+        };
+    }
+</script>
+
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
